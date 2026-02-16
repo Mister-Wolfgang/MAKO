@@ -2,7 +2,7 @@
 
 ## Overview
 
-Two complementary test suites for MAKO v5.1.0 hooks:
+Two complementary test suites for MAKO v6.1.0 hooks:
 
 | Test Suite | Author | Focus | Tests |
 |------------|--------|-------|-------|
