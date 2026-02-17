@@ -1,3 +1,5 @@
+![MAKO](logo.jpg)
+
 # MAKO (Modular Agent Kit for Orchestration) v6.1
 
 > *"Le pouvoir n'est rien sans controle."* -- Rufus Shinra
