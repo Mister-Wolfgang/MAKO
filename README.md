@@ -7,7 +7,7 @@
 Système multi-agents pour **Claude Code** incarné par le personnel de la Shinra Electric Power Company. Conçu pour transformer un développeur solo en une équipe d'ingénierie complète.
 
 **Repository** : `mako-claude-agent-kit`
-**Marketplace** : [Claude Code Shinra Marketplace]()
+**Marketplace** : [Claude Code Shinra Marketplace](https://github.com/Mister-Wolfgang/claude-code-shinra-marketplace)
 
 ---
 
