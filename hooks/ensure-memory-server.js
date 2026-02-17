@@ -2,13 +2,17 @@
  * MAKO Hook: ensure-memory-server.js
  *
  * Lightweight session-start hook for mcp-memory-service (Python/SQLite-Vec).
- * Replaces ensure-shodh-server.js.
  *
  * This hook only:
  *   1. Ensures the storage directory exists (~/.shinra/)
  *   2. Verifies mcp-memory-service is installed (pip)
- *   3. Syncs .mcp.json with the correct mcp-memory-service config
+ *   3. Adjusts the Python command in marketplace.json if the detected
+ *      Python differs from the declared default
  *   4. Reports status
+ *
+ * The MCP server declaration lives in marketplace.json (mcpServers.memory).
+ * This hook dynamically patches the "command" field if the local Python
+ * executable differs (e.g. "py -3" on Windows vs "python" default).
  *
  * Constraints:
  *   - Node.js only (no external npm deps)
@@ -20,28 +24,87 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const { execSync } = require("child_process");
-const { isMemoryServiceHealthy, memoryFallbackMessage } = require("./lib/memory-fallback");
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const PLUGIN_DIR = path.join(__dirname, "..");
-const MCP_JSON_PATH = path.join(PLUGIN_DIR, ".mcp.json");
+const HOME_DIR = os.homedir();
 
-const SHINRA_HOME = path.join(os.homedir(), ".shinra");
+const SHINRA_HOME = path.join(HOME_DIR, ".shinra");
 const MEMORY_DB_PATH = path.join(SHINRA_HOME, "memory.db");
+const PYTHON_CACHE_PATH = path.join(SHINRA_HOME, "python-cache.json");
+
+// Path to marketplace.json (relative to plugin root)
+const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, "..");
+const MARKETPLACE_JSON_PATH = path.resolve(PLUGIN_ROOT, "..", "..", ".claude-plugin", "marketplace.json");
+
+// Cache TTL: 24 hours
+const PYTHON_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
-// Find Python executable
+// Find Python executable (with caching)
 // ---------------------------------------------------------------------------
+
+/**
+ * Read cached Python detection result if still valid.
+ * @returns {{ cmd: string|null, installed: boolean }|null}
+ */
+function readPythonCache() {
+  try {
+    if (!fs.existsSync(PYTHON_CACHE_PATH)) return null;
+    const data = JSON.parse(fs.readFileSync(PYTHON_CACHE_PATH, "utf8"));
+    if (Date.now() - data.timestamp > PYTHON_CACHE_TTL_MS) return null;
+    // Verify the cached command still exists with a fast check
+    if (data.cmd) {
+      try {
+        execSync(`${data.cmd} --version 2>&1`, {
+          encoding: "utf8",
+          timeout: 3000,
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+      } catch {
+        return null; // cached command no longer works
+      }
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write Python detection result to cache.
+ */
+function writePythonCache(cmd, installed) {
+  try {
+    fs.writeFileSync(
+      PYTHON_CACHE_PATH,
+      JSON.stringify({ cmd, installed, timestamp: Date.now() }) + "\n"
+    );
+  } catch {}
+}
 
 function findPython() {
-  for (const cmd of ["python", "python3"]) {
+  // Check cache first
+  const cached = readPythonCache();
+  if (cached) {
+    log(`Python (cached): ${cached.cmd || "not found"}`);
+    return cached.cmd;
+  }
+
+  // On Windows, try "py -3" first (Python Launcher, avoids Windows Store stubs)
+  const candidates =
+    os.platform() === "win32"
+      ? ["py -3", "python", "python3"]
+      : ["python3", "python"];
+
+  for (const cmd of candidates) {
     try {
       const version = execSync(`${cmd} --version 2>&1`, {
         encoding: "utf8",
         timeout: 5000,
+        stdio: ["pipe", "pipe", "pipe"],
       }).trim();
       if (version.includes("Python 3.")) return cmd;
     } catch {}
@@ -57,7 +120,11 @@ function checkMemoryServiceInstalled(pythonCmd) {
   try {
     const result = execSync(
       `${pythonCmd} -c "import mcp_memory_service; print(mcp_memory_service.__file__)"`,
-      { encoding: "utf8", timeout: 10000 }
+      {
+        encoding: "utf8",
+        timeout: 10000,
+        stdio: ["pipe", "pipe", "pipe"],
+      }
     ).trim();
     return !!result;
   } catch {
@@ -66,33 +133,45 @@ function checkMemoryServiceInstalled(pythonCmd) {
 }
 
 // ---------------------------------------------------------------------------
-// .mcp.json sync
+// marketplace.json Python command sync
 // ---------------------------------------------------------------------------
 
-function syncMcpConfig(pythonCmd) {
-  const memoryEntry = {
-    command: pythonCmd,
-    args: ["-m", "mcp_memory_service.server"],
-    env: {
-      MCP_MEMORY_STORAGE_BACKEND: "sqlite_vec",
-      MCP_MEMORY_SQLITE_PATH: MEMORY_DB_PATH.replace(/\\/g, "/"),
-      MCP_HTTP_ENABLED: "true",
-      MCP_HTTP_PORT: "8000",
-    },
-  };
-
-  let existing = {};
+/**
+ * If the detected Python command differs from the one declared in
+ * marketplace.json mcpServers.memory.command, update it in place.
+ * This ensures the MCP server starts with the correct Python on the
+ * current machine (e.g. "py -3" on Windows).
+ */
+function syncMarketplacePythonCommand(pythonCmd) {
   try {
-    existing = JSON.parse(fs.readFileSync(MCP_JSON_PATH, "utf8"));
-  } catch {}
+    if (!fs.existsSync(MARKETPLACE_JSON_PATH)) {
+      log(`marketplace.json not found at ${MARKETPLACE_JSON_PATH} -- skipping sync`);
+      return;
+    }
 
-  const current = JSON.stringify(existing.memory || {});
-  const desired = JSON.stringify(memoryEntry);
-  if (current !== desired) {
-    // Remove old SHODH config if present
-    existing.memory = memoryEntry;
-    fs.writeFileSync(MCP_JSON_PATH, JSON.stringify(existing, null, 2) + "\n");
-    log(".mcp.json updated for mcp-memory-service");
+    const raw = fs.readFileSync(MARKETPLACE_JSON_PATH, "utf8");
+    const config = JSON.parse(raw);
+
+    if (
+      !config.mcpServers ||
+      !config.mcpServers.memory ||
+      typeof config.mcpServers.memory.command !== "string"
+    ) {
+      log("marketplace.json has no mcpServers.memory.command -- skipping sync");
+      return;
+    }
+
+    const current = config.mcpServers.memory.command;
+    if (current === pythonCmd) {
+      log(`marketplace.json Python command already matches: ${pythonCmd}`);
+      return;
+    }
+
+    config.mcpServers.memory.command = pythonCmd;
+    fs.writeFileSync(MARKETPLACE_JSON_PATH, JSON.stringify(config, null, 2) + "\n");
+    log(`marketplace.json updated: command "${current}" -> "${pythonCmd}"`);
+  } catch (err) {
+    log(`Warning: could not sync marketplace.json Python command: ${err.message}`);
   }
 }
 
@@ -129,6 +208,7 @@ async function main() {
   // Step 2: Find Python
   const pythonCmd = findPython();
   if (!pythonCmd) {
+    writePythonCache(null, false);
     log("Python 3 not found");
     output(
       "Python 3.10+ not found. Install Python and run: pip install mcp-memory-service"
@@ -139,6 +219,8 @@ async function main() {
 
   // Step 3: Verify mcp-memory-service
   const installed = checkMemoryServiceInstalled(pythonCmd);
+  writePythonCache(pythonCmd, installed);
+
   if (!installed) {
     log("mcp-memory-service not installed");
     output(
@@ -148,19 +230,14 @@ async function main() {
   }
   log("mcp-memory-service is installed");
 
-  // Step 4: Sync .mcp.json
-  syncMcpConfig(pythonCmd);
+  // Step 4: Sync Python command in marketplace.json if needed
+  syncMarketplacePythonCommand(pythonCmd);
 
-  // Step 5: Check MCP Memory health (ST-9 fallback)
-  const healthy = isMemoryServiceHealthy();
-  if (!healthy) {
-    const fallbackMsg = memoryFallbackMessage("ensure-memory-server");
-    log(`WARNING: ${fallbackMsg}`);
-    output("mcp-memory-service configured (SQLite-Vec) -- memory service unhealthy, fallback active");
-    return;
-  }
-
-  // Step 6: Report success
+  // Step 5: Report success
+  // NOTE: Health check removed from SessionStart -- the MCP service is not yet
+  // started at this stage so probing it is pointless and adds ~2-3s latency.
+  // The fallback logic in individual hooks (subagent-stop, pre-compact) handles
+  // runtime unavailability independently.
   output("mcp-memory-service configured (SQLite-Vec)");
   log(`Storage path: ${MEMORY_DB_PATH}`);
   log("Ready.");

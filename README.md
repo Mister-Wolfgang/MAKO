@@ -132,6 +132,20 @@ mako-ai-agents/
 
 ## Changelog
 
+### v1.2.0 -- Native MCP Server Declaration
+
+- **Feat**: MCP `memory` server declared natively in `marketplace.json` (`mcpServers.memory`) -- Claude Code now starts `mcp-memory-service` automatically without `~/.mcp.json`
+- **Refactor**: `ensure-memory-server.js` no longer writes to `~/.mcp.json`; instead dynamically patches `marketplace.json` command if detected Python differs from declared default (e.g. `py -3` on Windows)
+- **Remove**: `syncMcpConfig()` function and all `~/.mcp.json` write logic removed from session-start hook
+
+### v1.1.0 -- Hooks Fix & Performance
+
+- **Fix**: `.mcp.json` now written to `~/.mcp.json` (home directory) instead of plugin cache; merges with existing `mcpServers` config
+- **Fix**: Remove `<system-reminder>` double-wrapping in `user-prompt-submit-rufus.js` (framework handles injection)
+- **Fix**: Improved Python detection on Windows (`py -3` launcher tried first, avoids Windows Store stubs)
+- **Perf**: Python detection result cached in `~/.shinra/python-cache.json` (24h TTL), eliminating repeated `execSync` calls
+- **Perf**: Removed synchronous HTTP health check from `SessionStart` hook (MCP service not yet started at that stage); runtime fallback handled by individual hooks
+
 ### v1.0.0 -- Initial Release
 
 - 13 specialized AI agents for full project lifecycle

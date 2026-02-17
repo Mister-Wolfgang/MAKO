@@ -26,7 +26,7 @@ import {
 } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const HOOKS_DIR = resolve(__dirname, '..');
@@ -248,8 +248,6 @@ describe('ST-2: inject-rufus.js', () => {
 
 describe('ST-2: ensure-memory-server.js', () => {
   let tempDir;
-  let backupMcpJson;
-  const MCP_JSON_PATH = join(PLUGIN_ROOT, '.mcp.json');
 
   beforeAll(() => {
     // Create the mock wrapper script for ensure-memory-server.js
@@ -267,8 +265,14 @@ describe('ST-2: ensure-memory-server.js', () => {
 
 const Module = require('module');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
 const scenario = process.env.MOCK_SCENARIO || 'python-found';
+
+// Clear Python cache before running to ensure test isolation
+const cachePath = path.join(os.homedir(), '.shinra', 'python-cache.json');
+try { fs.unlinkSync(cachePath); } catch {}
 
 // ---------------------------------------------------------------------------
 // Mock execSync before the hook loads
@@ -315,23 +319,40 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
     writeFileSync(join(__dirname, 'mocks', 'ensure-memory-wrapper.js'), wrapperContent);
   });
 
+  const PYTHON_CACHE_PATH = join(homedir(), '.shinra', 'python-cache.json');
+  const MARKETPLACE_JSON_PATH = resolve(PLUGIN_ROOT, '..', '..', '.claude-plugin', 'marketplace.json');
+  let backupPythonCache;
+  let backupMarketplaceJson;
+
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'mako-st2-'));
 
-    // Backup existing .mcp.json if it exists
-    if (existsSync(MCP_JSON_PATH)) {
-      backupMcpJson = readFileSync(MCP_JSON_PATH, 'utf8');
+    // Backup existing marketplace.json
+    if (existsSync(MARKETPLACE_JSON_PATH)) {
+      backupMarketplaceJson = readFileSync(MARKETPLACE_JSON_PATH, 'utf8');
     } else {
-      backupMcpJson = null;
+      backupMarketplaceJson = null;
+    }
+
+    // Backup existing python-cache.json if it exists
+    if (existsSync(PYTHON_CACHE_PATH)) {
+      backupPythonCache = readFileSync(PYTHON_CACHE_PATH, 'utf8');
+    } else {
+      backupPythonCache = null;
     }
   });
 
   afterEach(() => {
-    // Restore .mcp.json
-    if (backupMcpJson !== null) {
-      writeFileSync(MCP_JSON_PATH, backupMcpJson);
-    } else if (existsSync(MCP_JSON_PATH)) {
-      rmSync(MCP_JSON_PATH, { force: true });
+    // Restore marketplace.json
+    if (backupMarketplaceJson !== null) {
+      writeFileSync(MARKETPLACE_JSON_PATH, backupMarketplaceJson);
+    }
+
+    // Restore python-cache.json
+    if (backupPythonCache !== null) {
+      writeFileSync(PYTHON_CACHE_PATH, backupPythonCache);
+    } else if (existsSync(PYTHON_CACHE_PATH)) {
+      rmSync(PYTHON_CACHE_PATH, { force: true });
     }
 
     // Clean temp dir
@@ -386,46 +407,41 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
       expect(exitCode).toBe(0);
     });
 
-    it('creates or updates .mcp.json with memory entry', () => {
-      // Remove existing .mcp.json to test creation
-      if (existsSync(MCP_JSON_PATH)) {
-        rmSync(MCP_JSON_PATH, { force: true });
-      }
-
+    it('marketplace.json mcpServers.memory has command, args, and env', () => {
       execEnsureMemoryWithMock('python-found');
 
-      expect(existsSync(MCP_JSON_PATH)).toBe(true);
-      const mcpConfig = JSON.parse(readFileSync(MCP_JSON_PATH, 'utf8'));
-      expect(mcpConfig).toHaveProperty('memory');
-      expect(mcpConfig.memory).toHaveProperty('command');
-      expect(mcpConfig.memory).toHaveProperty('args');
-      expect(mcpConfig.memory).toHaveProperty('env');
+      const config = JSON.parse(readFileSync(MARKETPLACE_JSON_PATH, 'utf8'));
+      expect(config).toHaveProperty('mcpServers');
+      expect(config.mcpServers).toHaveProperty('memory');
+      expect(config.mcpServers.memory).toHaveProperty('command');
+      expect(config.mcpServers.memory).toHaveProperty('args');
+      expect(config.mcpServers.memory).toHaveProperty('env');
     });
 
-    it('.mcp.json memory entry has correct args for mcp-memory-service', () => {
-      if (existsSync(MCP_JSON_PATH)) {
-        rmSync(MCP_JSON_PATH, { force: true });
-      }
-
+    it('marketplace.json mcpServers.memory has correct args for mcp-memory-service', () => {
       execEnsureMemoryWithMock('python-found');
 
-      const mcpConfig = JSON.parse(readFileSync(MCP_JSON_PATH, 'utf8'));
-      expect(mcpConfig.memory.args).toEqual(['-m', 'mcp_memory_service.server']);
+      const config = JSON.parse(readFileSync(MARKETPLACE_JSON_PATH, 'utf8'));
+      expect(config.mcpServers.memory.args).toEqual(['-m', 'mcp_memory_service.server']);
     });
 
-    it('.mcp.json memory entry env has expected keys', () => {
-      if (existsSync(MCP_JSON_PATH)) {
-        rmSync(MCP_JSON_PATH, { force: true });
-      }
-
+    it('marketplace.json mcpServers.memory env has expected keys', () => {
       execEnsureMemoryWithMock('python-found');
 
-      const mcpConfig = JSON.parse(readFileSync(MCP_JSON_PATH, 'utf8'));
-      const memEnv = mcpConfig.memory.env;
+      const config = JSON.parse(readFileSync(MARKETPLACE_JSON_PATH, 'utf8'));
+      const memEnv = config.mcpServers.memory.env;
       expect(memEnv).toHaveProperty('MCP_MEMORY_STORAGE_BACKEND', 'sqlite_vec');
-      expect(memEnv).toHaveProperty('MCP_HTTP_ENABLED', 'true');
-      expect(memEnv).toHaveProperty('MCP_HTTP_PORT', '8000');
       expect(memEnv).toHaveProperty('MCP_MEMORY_SQLITE_PATH');
+    });
+
+    it('does not write to ~/.mcp.json', () => {
+      const MCP_JSON_PATH = join(homedir(), '.mcp.json');
+      const beforeContent = existsSync(MCP_JSON_PATH) ? readFileSync(MCP_JSON_PATH, 'utf8') : null;
+
+      execEnsureMemoryWithMock('python-found');
+
+      const afterContent = existsSync(MCP_JSON_PATH) ? readFileSync(MCP_JSON_PATH, 'utf8') : null;
+      expect(afterContent).toBe(beforeContent);
     });
   });
 
@@ -507,36 +523,29 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
   });
 
   // -----------------------------------------------------------------------
-  // .mcp.json idempotency
+  // marketplace.json idempotency
   // -----------------------------------------------------------------------
 
-  describe('idempotency: .mcp.json sync', () => {
-    it('running twice does not duplicate or corrupt .mcp.json', () => {
-      if (existsSync(MCP_JSON_PATH)) {
-        rmSync(MCP_JSON_PATH, { force: true });
-      }
+  describe('idempotency: marketplace.json sync', () => {
+    it('running twice does not duplicate or corrupt marketplace.json', () => {
+      execEnsureMemoryWithMock('python-found');
+      const firstContent = readFileSync(MARKETPLACE_JSON_PATH, 'utf8');
 
       execEnsureMemoryWithMock('python-found');
-      const firstContent = readFileSync(MCP_JSON_PATH, 'utf8');
-
-      execEnsureMemoryWithMock('python-found');
-      const secondContent = readFileSync(MCP_JSON_PATH, 'utf8');
+      const secondContent = readFileSync(MARKETPLACE_JSON_PATH, 'utf8');
 
       expect(secondContent).toBe(firstContent);
     });
 
-    it('preserves existing non-memory keys in .mcp.json', () => {
-      // Pre-populate .mcp.json with extra config
-      const existing = {
-        someOtherServer: { command: 'other', args: [] },
-      };
-      writeFileSync(MCP_JSON_PATH, JSON.stringify(existing, null, 2) + '\n');
-
+    it('preserves existing plugins and metadata in marketplace.json', () => {
       execEnsureMemoryWithMock('python-found');
 
-      const updated = JSON.parse(readFileSync(MCP_JSON_PATH, 'utf8'));
-      expect(updated).toHaveProperty('someOtherServer');
-      expect(updated).toHaveProperty('memory');
+      const config = JSON.parse(readFileSync(MARKETPLACE_JSON_PATH, 'utf8'));
+      expect(config).toHaveProperty('name', 'shinra-marketplace');
+      expect(config).toHaveProperty('plugins');
+      expect(config.plugins.length).toBeGreaterThan(0);
+      expect(config.plugins[0]).toHaveProperty('name', 'mako-ai-agents');
+      expect(config).toHaveProperty('metadata');
     });
   });
 
