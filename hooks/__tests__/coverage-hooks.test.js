@@ -36,7 +36,7 @@ import {
 } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const HOOKS_DIR = resolve(__dirname, '..');
@@ -324,14 +324,14 @@ describe('Direct coverage: user-prompt-submit-rufus.js', () => {
     expect(output.message).not.toContain('AgentIDs');
   });
 
-  it('message contains system-reminder wrapper tags', () => {
+  it('message does NOT contain system-reminder wrapper tags (framework handles it)', () => {
     const stdout = loadHook('user-prompt-submit-rufus.js', {
       CLAUDE_PROJECT_DIR: tmpDir,
     });
 
     const output = parseOutput(stdout);
-    expect(output.message).toContain('<system-reminder>');
-    expect(output.message).toContain('</system-reminder>');
+    expect(output.message).not.toContain('<system-reminder>');
+    expect(output.message).not.toContain('</system-reminder>');
   });
 
   it('story count logic: counts done stories correctly', () => {
@@ -966,13 +966,28 @@ describe('Direct coverage: pre-compact-save.js -- global outer catch', () => {
 
 describe('Direct coverage: ensure-memory-server.js', () => {
   let tmpDir;
+  const PYTHON_CACHE_PATH = join(homedir(), '.shinra', 'python-cache.json');
+  let backupPythonCache;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'mako-cov-ensure-'));
+    // Backup and clear python cache for test isolation
+    if (existsSync(PYTHON_CACHE_PATH)) {
+      backupPythonCache = readFileSync(PYTHON_CACHE_PATH, 'utf8');
+      rmSync(PYTHON_CACHE_PATH, { force: true });
+    } else {
+      backupPythonCache = null;
+    }
   });
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
+    // Restore python cache
+    if (backupPythonCache !== null) {
+      writeFileSync(PYTHON_CACHE_PATH, backupPythonCache);
+    } else if (existsSync(PYTHON_CACHE_PATH)) {
+      rmSync(PYTHON_CACHE_PATH, { force: true });
+    }
   });
 
   async function loadEnsureMemoryServer(scenario = 'python-found', extraEnv = {}) {

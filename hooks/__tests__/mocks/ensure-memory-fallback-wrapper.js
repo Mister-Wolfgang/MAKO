@@ -12,8 +12,14 @@
 
 const Module = require('module');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
 const scenario = process.env.MOCK_SCENARIO || 'mcp-down';
+
+// Clear Python cache before running to ensure test isolation
+const cachePath = path.join(os.homedir(), '.shinra', 'python-cache.json');
+try { fs.unlinkSync(cachePath); } catch {}
 
 // Force MCP_MEMORY_HEALTHY=false for mcp-down scenario
 if (scenario === 'mcp-down') {

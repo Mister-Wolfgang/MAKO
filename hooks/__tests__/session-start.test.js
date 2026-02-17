@@ -26,7 +26,7 @@ import {
 } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const HOOKS_DIR = resolve(__dirname, '..');
@@ -249,7 +249,7 @@ describe('ST-2: inject-rufus.js', () => {
 describe('ST-2: ensure-memory-server.js', () => {
   let tempDir;
   let backupMcpJson;
-  const MCP_JSON_PATH = join(PLUGIN_ROOT, '.mcp.json');
+  const MCP_JSON_PATH = join(homedir(), '.mcp.json');
 
   beforeAll(() => {
     // Create the mock wrapper script for ensure-memory-server.js
@@ -267,8 +267,14 @@ describe('ST-2: ensure-memory-server.js', () => {
 
 const Module = require('module');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
 const scenario = process.env.MOCK_SCENARIO || 'python-found';
+
+// Clear Python cache before running to ensure test isolation
+const cachePath = path.join(os.homedir(), '.shinra', 'python-cache.json');
+try { fs.unlinkSync(cachePath); } catch {}
 
 // ---------------------------------------------------------------------------
 // Mock execSync before the hook loads
@@ -315,6 +321,9 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
     writeFileSync(join(__dirname, 'mocks', 'ensure-memory-wrapper.js'), wrapperContent);
   });
 
+  const PYTHON_CACHE_PATH = join(homedir(), '.shinra', 'python-cache.json');
+  let backupPythonCache;
+
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'mako-st2-'));
 
@@ -324,6 +333,13 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
     } else {
       backupMcpJson = null;
     }
+
+    // Backup existing python-cache.json if it exists
+    if (existsSync(PYTHON_CACHE_PATH)) {
+      backupPythonCache = readFileSync(PYTHON_CACHE_PATH, 'utf8');
+    } else {
+      backupPythonCache = null;
+    }
   });
 
   afterEach(() => {
@@ -332,6 +348,13 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
       writeFileSync(MCP_JSON_PATH, backupMcpJson);
     } else if (existsSync(MCP_JSON_PATH)) {
       rmSync(MCP_JSON_PATH, { force: true });
+    }
+
+    // Restore python-cache.json
+    if (backupPythonCache !== null) {
+      writeFileSync(PYTHON_CACHE_PATH, backupPythonCache);
+    } else if (existsSync(PYTHON_CACHE_PATH)) {
+      rmSync(PYTHON_CACHE_PATH, { force: true });
     }
 
     // Clean temp dir
@@ -386,7 +409,7 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
       expect(exitCode).toBe(0);
     });
 
-    it('creates or updates .mcp.json with memory entry', () => {
+    it('creates or updates ~/.mcp.json with mcpServers.memory entry', () => {
       // Remove existing .mcp.json to test creation
       if (existsSync(MCP_JSON_PATH)) {
         rmSync(MCP_JSON_PATH, { force: true });
@@ -396,13 +419,14 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
 
       expect(existsSync(MCP_JSON_PATH)).toBe(true);
       const mcpConfig = JSON.parse(readFileSync(MCP_JSON_PATH, 'utf8'));
-      expect(mcpConfig).toHaveProperty('memory');
-      expect(mcpConfig.memory).toHaveProperty('command');
-      expect(mcpConfig.memory).toHaveProperty('args');
-      expect(mcpConfig.memory).toHaveProperty('env');
+      expect(mcpConfig).toHaveProperty('mcpServers');
+      expect(mcpConfig.mcpServers).toHaveProperty('memory');
+      expect(mcpConfig.mcpServers.memory).toHaveProperty('command');
+      expect(mcpConfig.mcpServers.memory).toHaveProperty('args');
+      expect(mcpConfig.mcpServers.memory).toHaveProperty('env');
     });
 
-    it('.mcp.json memory entry has correct args for mcp-memory-service', () => {
+    it('.mcp.json mcpServers.memory entry has correct args for mcp-memory-service', () => {
       if (existsSync(MCP_JSON_PATH)) {
         rmSync(MCP_JSON_PATH, { force: true });
       }
@@ -410,10 +434,10 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
       execEnsureMemoryWithMock('python-found');
 
       const mcpConfig = JSON.parse(readFileSync(MCP_JSON_PATH, 'utf8'));
-      expect(mcpConfig.memory.args).toEqual(['-m', 'mcp_memory_service.server']);
+      expect(mcpConfig.mcpServers.memory.args).toEqual(['-m', 'mcp_memory_service.server']);
     });
 
-    it('.mcp.json memory entry env has expected keys', () => {
+    it('.mcp.json mcpServers.memory entry env has expected keys', () => {
       if (existsSync(MCP_JSON_PATH)) {
         rmSync(MCP_JSON_PATH, { force: true });
       }
@@ -421,7 +445,7 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
       execEnsureMemoryWithMock('python-found');
 
       const mcpConfig = JSON.parse(readFileSync(MCP_JSON_PATH, 'utf8'));
-      const memEnv = mcpConfig.memory.env;
+      const memEnv = mcpConfig.mcpServers.memory.env;
       expect(memEnv).toHaveProperty('MCP_MEMORY_STORAGE_BACKEND', 'sqlite_vec');
       expect(memEnv).toHaveProperty('MCP_HTTP_ENABLED', 'true');
       expect(memEnv).toHaveProperty('MCP_HTTP_PORT', '8000');
@@ -526,17 +550,21 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
     });
 
     it('preserves existing non-memory keys in .mcp.json', () => {
-      // Pre-populate .mcp.json with extra config
+      // Pre-populate .mcp.json with extra config (including other mcpServers)
       const existing = {
-        someOtherServer: { command: 'other', args: [] },
+        mcpServers: {
+          someOtherServer: { command: 'other', args: [] },
+        },
+        topLevelKey: 'preserved',
       };
       writeFileSync(MCP_JSON_PATH, JSON.stringify(existing, null, 2) + '\n');
 
       execEnsureMemoryWithMock('python-found');
 
       const updated = JSON.parse(readFileSync(MCP_JSON_PATH, 'utf8'));
-      expect(updated).toHaveProperty('someOtherServer');
-      expect(updated).toHaveProperty('memory');
+      expect(updated).toHaveProperty('topLevelKey', 'preserved');
+      expect(updated.mcpServers).toHaveProperty('someOtherServer');
+      expect(updated.mcpServers).toHaveProperty('memory');
     });
   });
 

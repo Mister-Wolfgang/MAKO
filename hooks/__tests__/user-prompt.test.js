@@ -110,10 +110,10 @@ describe('ST-3: UserPromptSubmit Hook (user-prompt-submit-rufus.js)', () => {
       expect(output.message).toContain('No active sprint');
     });
 
-    it('message still contains system-reminder wrapper', () => {
+    it('message does NOT contain system-reminder wrapper (framework handles it)', () => {
       const output = runHook(tmpDir);
-      expect(output.message).toContain('<system-reminder>');
-      expect(output.message).toContain('</system-reminder>');
+      expect(output.message).not.toContain('<system-reminder>');
+      expect(output.message).not.toContain('</system-reminder>');
     });
 
     it('message still contains RUFUS CONTEXT RELOAD marker', () => {
@@ -324,16 +324,17 @@ stories:
   // =========================================================================
 
   describe('Message structure', () => {
-    it('message starts with <system-reminder>', () => {
+    it('message starts with [RUFUS CONTEXT RELOAD]', () => {
       writeFileSync(join(tmpDir, 'sprint-status.yaml'), SPRINT_STATUS_YAML);
       const output = runHook(tmpDir);
-      expect(output.message.startsWith('<system-reminder>')).toBe(true);
+      expect(output.message.startsWith('[RUFUS CONTEXT RELOAD]')).toBe(true);
     });
 
-    it('message ends with </system-reminder>', () => {
+    it('message does NOT contain system-reminder tags (framework handles wrapping)', () => {
       writeFileSync(join(tmpDir, 'sprint-status.yaml'), SPRINT_STATUS_YAML);
       const output = runHook(tmpDir);
-      expect(output.message.endsWith('</system-reminder>')).toBe(true);
+      expect(output.message).not.toContain('<system-reminder>');
+      expect(output.message).not.toContain('</system-reminder>');
     });
 
     it('message contains [RUFUS CONTEXT RELOAD] marker', () => {
@@ -349,11 +350,11 @@ stories:
       expect(output.message).toContain('Delegue');
     });
 
-    it('message has exactly 5 lines (system-reminder, marker, sprint, rules, close tag)', () => {
+    it('message has exactly 3 lines (marker, sprint, rules)', () => {
       writeFileSync(join(tmpDir, 'sprint-status.yaml'), SPRINT_STATUS_YAML);
       const output = runHook(tmpDir);
       const lines = output.message.split('\n');
-      expect(lines).toHaveLength(5);
+      expect(lines).toHaveLength(3);
     });
   });
 

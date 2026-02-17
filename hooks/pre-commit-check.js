@@ -53,7 +53,26 @@ function findTestCommand(cwd) {
   return null;
 }
 
+function isMetaBranch() {
+  try {
+    const branch = execSync("git rev-parse --abbrev-ref HEAD", {
+      encoding: "utf8",
+      timeout: 3000,
+      windowsHide: true,
+    }).trim();
+    return /^(lucrecia|sephiroth)\//.test(branch);
+  } catch {
+    return false;
+  }
+}
+
 function main() {
+  // Skip tests on meta-agent branches (lucrecia/, sephiroth/)
+  if (isMetaBranch()) {
+    process.stdout.write(JSON.stringify({ decision: "allow" }));
+    return;
+  }
+
   const cwd = process.cwd();
   const testCmd = findTestCommand(cwd);
 

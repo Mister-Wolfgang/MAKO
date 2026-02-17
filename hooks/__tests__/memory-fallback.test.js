@@ -264,6 +264,10 @@ describe('ST-9: Hook integration -- MCP Memory Down', () => {
 
   // -------------------------------------------------------------------------
   // ensure-memory-server.js with MCP down
+  // NOTE: Since v1.1.0, the health check was removed from SessionStart
+  // (the MCP service is not yet started at this stage). The hook now always
+  // reports "configured" when Python + mcp-memory-service are found.
+  // Runtime fallback is handled by individual hooks (subagent-stop, pre-compact).
   // -------------------------------------------------------------------------
 
   describe('ensure-memory-server.js with MCP down', () => {
@@ -284,12 +288,10 @@ describe('ST-9: Hook integration -- MCP Memory Down', () => {
       expect(output.hookSpecificOutput.hookEventName).toBe('SessionStart');
     });
 
-    it('stderr contains a warning about MCP memory being unavailable', () => {
-      const { stderr } = execEnsureMemoryWithMock('mcp-down');
-      const lower = stderr.toLowerCase();
-      expect(
-        lower.includes('memory') && (lower.includes('unavailable') || lower.includes('fallback') || lower.includes('warning') || lower.includes('down') || lower.includes('unhealthy'))
-      ).toBe(true);
+    it('reports configured status (health check deferred to runtime hooks)', () => {
+      const { stdout } = execEnsureMemoryWithMock('mcp-down');
+      const output = parseOutput(stdout);
+      expect(output.hookSpecificOutput.statusMessage).toContain('configured');
     });
 
     it('workflow continues -- statusMessage is present and non-empty', () => {
