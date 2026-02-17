@@ -6,11 +6,11 @@
  * This hook only:
  *   1. Ensures the storage directory exists (~/.shinra/)
  *   2. Verifies mcp-memory-service is installed (pip)
- *   3. Adjusts the Python command in marketplace.json if the detected
+ *   3. Adjusts the Python command in .mcp.json if the detected
  *      Python differs from the declared default
  *   4. Reports status
  *
- * The MCP server declaration lives in marketplace.json (mcpServers.memory).
+ * The MCP server declaration lives in .mcp.json at the plugin root.
  * This hook dynamically patches the "command" field if the local Python
  * executable differs (e.g. "py -3" on Windows vs "python" default).
  *
@@ -35,9 +35,9 @@ const SHINRA_HOME = path.join(HOME_DIR, ".shinra");
 const MEMORY_DB_PATH = path.join(SHINRA_HOME, "memory.db");
 const PYTHON_CACHE_PATH = path.join(SHINRA_HOME, "python-cache.json");
 
-// Path to marketplace.json (relative to plugin root)
+// Path to .mcp.json at plugin root
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, "..");
-const MARKETPLACE_JSON_PATH = path.resolve(PLUGIN_ROOT, "..", "..", ".claude-plugin", "marketplace.json");
+const MCP_JSON_PATH = path.join(PLUGIN_ROOT, ".mcp.json");
 
 // Cache TTL: 24 hours
 const PYTHON_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -133,23 +133,23 @@ function checkMemoryServiceInstalled(pythonCmd) {
 }
 
 // ---------------------------------------------------------------------------
-// marketplace.json Python command sync
+// .mcp.json Python command sync
 // ---------------------------------------------------------------------------
 
 /**
  * If the detected Python command differs from the one declared in
- * marketplace.json mcpServers.memory.command, update it in place.
+ * .mcp.json mcpServers.memory.command, update it in place.
  * This ensures the MCP server starts with the correct Python on the
  * current machine (e.g. "py -3" on Windows).
  */
-function syncMarketplacePythonCommand(pythonCmd) {
+function syncPluginMcpPythonCommand(pythonCmd) {
   try {
-    if (!fs.existsSync(MARKETPLACE_JSON_PATH)) {
-      log(`marketplace.json not found at ${MARKETPLACE_JSON_PATH} -- skipping sync`);
+    if (!fs.existsSync(MCP_JSON_PATH)) {
+      log(`.mcp.json not found at ${MCP_JSON_PATH} -- skipping sync`);
       return;
     }
 
-    const raw = fs.readFileSync(MARKETPLACE_JSON_PATH, "utf8");
+    const raw = fs.readFileSync(MCP_JSON_PATH, "utf8");
     const config = JSON.parse(raw);
 
     if (
@@ -157,21 +157,21 @@ function syncMarketplacePythonCommand(pythonCmd) {
       !config.mcpServers.memory ||
       typeof config.mcpServers.memory.command !== "string"
     ) {
-      log("marketplace.json has no mcpServers.memory.command -- skipping sync");
+      log(".mcp.json has no mcpServers.memory.command -- skipping sync");
       return;
     }
 
     const current = config.mcpServers.memory.command;
     if (current === pythonCmd) {
-      log(`marketplace.json Python command already matches: ${pythonCmd}`);
+      log(`.mcp.json Python command already matches: ${pythonCmd}`);
       return;
     }
 
     config.mcpServers.memory.command = pythonCmd;
-    fs.writeFileSync(MARKETPLACE_JSON_PATH, JSON.stringify(config, null, 2) + "\n");
-    log(`marketplace.json updated: command "${current}" -> "${pythonCmd}"`);
+    fs.writeFileSync(MCP_JSON_PATH, JSON.stringify(config, null, 2) + "\n");
+    log(`.mcp.json updated: command "${current}" -> "${pythonCmd}"`);
   } catch (err) {
-    log(`Warning: could not sync marketplace.json Python command: ${err.message}`);
+    log(`Warning: could not sync .mcp.json Python command: ${err.message}`);
   }
 }
 
@@ -230,8 +230,8 @@ async function main() {
   }
   log("mcp-memory-service is installed");
 
-  // Step 4: Sync Python command in marketplace.json if needed
-  syncMarketplacePythonCommand(pythonCmd);
+  // Step 4: Sync Python command in .mcp.json if needed
+  syncPluginMcpPythonCommand(pythonCmd);
 
   // Step 5: Report success
   // NOTE: Health check removed from SessionStart -- the MCP service is not yet

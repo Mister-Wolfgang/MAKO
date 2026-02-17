@@ -85,6 +85,7 @@ Strict implementation enforced by Hojo:
 mako-ai-agents/
 ├── .claude-plugin/
 │   └── plugin.json          # Plugin metadata and version
+├── .mcp.json                  # MCP server declarations (memory service)
 ├── .github/
 │   └── workflows/ci.yml     # CI pipeline
 ├── agents/                   # Markdown definitions for all 13 agents
@@ -134,8 +135,8 @@ mako-ai-agents/
 
 ### v1.2.0 -- Native MCP Server Declaration
 
-- **Feat**: MCP `memory` server declared natively in `marketplace.json` (`mcpServers.memory`) -- Claude Code now starts `mcp-memory-service` automatically without `~/.mcp.json`
-- **Refactor**: `ensure-memory-server.js` no longer writes to `~/.mcp.json`; instead dynamically patches `marketplace.json` command if detected Python differs from declared default (e.g. `py -3` on Windows)
+- **Feat**: MCP `memory` server declared in `.mcp.json` at plugin root -- Claude Code now starts `mcp-memory-service` automatically without `~/.mcp.json`
+- **Refactor**: `ensure-memory-server.js` no longer writes to `~/.mcp.json`; instead dynamically patches `.mcp.json` command if detected Python differs from declared default (e.g. `py -3` on Windows)
 - **Remove**: `syncMcpConfig()` function and all `~/.mcp.json` write logic removed from session-start hook
 
 ### v1.1.0 -- Hooks Fix & Performance

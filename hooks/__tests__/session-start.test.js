@@ -320,18 +320,18 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
   });
 
   const PYTHON_CACHE_PATH = join(homedir(), '.shinra', 'python-cache.json');
-  const MARKETPLACE_JSON_PATH = resolve(PLUGIN_ROOT, '..', '..', '.claude-plugin', 'marketplace.json');
+  const MCP_JSON_PATH = join(PLUGIN_ROOT, '.mcp.json');
   let backupPythonCache;
-  let backupMarketplaceJson;
+  let backupMcpJson;
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'mako-st2-'));
 
-    // Backup existing marketplace.json
-    if (existsSync(MARKETPLACE_JSON_PATH)) {
-      backupMarketplaceJson = readFileSync(MARKETPLACE_JSON_PATH, 'utf8');
+    // Backup existing .mcp.json
+    if (existsSync(MCP_JSON_PATH)) {
+      backupMcpJson = readFileSync(MCP_JSON_PATH, 'utf8');
     } else {
-      backupMarketplaceJson = null;
+      backupMcpJson = null;
     }
 
     // Backup existing python-cache.json if it exists
@@ -343,9 +343,9 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
   });
 
   afterEach(() => {
-    // Restore marketplace.json
-    if (backupMarketplaceJson !== null) {
-      writeFileSync(MARKETPLACE_JSON_PATH, backupMarketplaceJson);
+    // Restore .mcp.json
+    if (backupMcpJson !== null) {
+      writeFileSync(MCP_JSON_PATH, backupMcpJson);
     }
 
     // Restore python-cache.json
@@ -407,10 +407,10 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
       expect(exitCode).toBe(0);
     });
 
-    it('marketplace.json mcpServers.memory has command, args, and env', () => {
+    it('.mcp.json mcpServers.memory has command, args, and env', () => {
       execEnsureMemoryWithMock('python-found');
 
-      const config = JSON.parse(readFileSync(MARKETPLACE_JSON_PATH, 'utf8'));
+      const config = JSON.parse(readFileSync(MCP_JSON_PATH, 'utf8'));
       expect(config).toHaveProperty('mcpServers');
       expect(config.mcpServers).toHaveProperty('memory');
       expect(config.mcpServers.memory).toHaveProperty('command');
@@ -418,17 +418,17 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
       expect(config.mcpServers.memory).toHaveProperty('env');
     });
 
-    it('marketplace.json mcpServers.memory has correct args for mcp-memory-service', () => {
+    it('.mcp.json mcpServers.memory has correct args for mcp-memory-service', () => {
       execEnsureMemoryWithMock('python-found');
 
-      const config = JSON.parse(readFileSync(MARKETPLACE_JSON_PATH, 'utf8'));
+      const config = JSON.parse(readFileSync(MCP_JSON_PATH, 'utf8'));
       expect(config.mcpServers.memory.args).toEqual(['-m', 'mcp_memory_service.server']);
     });
 
-    it('marketplace.json mcpServers.memory env has expected keys', () => {
+    it('.mcp.json mcpServers.memory env has expected keys', () => {
       execEnsureMemoryWithMock('python-found');
 
-      const config = JSON.parse(readFileSync(MARKETPLACE_JSON_PATH, 'utf8'));
+      const config = JSON.parse(readFileSync(MCP_JSON_PATH, 'utf8'));
       const memEnv = config.mcpServers.memory.env;
       expect(memEnv).toHaveProperty('MCP_MEMORY_STORAGE_BACKEND', 'sqlite_vec');
       expect(memEnv).toHaveProperty('MCP_MEMORY_SQLITE_PATH');
@@ -526,26 +526,26 @@ require(path.join(__dirname, '..', '..', 'ensure-memory-server.js'));
   // marketplace.json idempotency
   // -----------------------------------------------------------------------
 
-  describe('idempotency: marketplace.json sync', () => {
-    it('running twice does not duplicate or corrupt marketplace.json', () => {
+  describe('idempotency: .mcp.json sync', () => {
+    it('running twice does not duplicate or corrupt .mcp.json', () => {
       execEnsureMemoryWithMock('python-found');
-      const firstContent = readFileSync(MARKETPLACE_JSON_PATH, 'utf8');
+      const firstContent = readFileSync(MCP_JSON_PATH, 'utf8');
 
       execEnsureMemoryWithMock('python-found');
-      const secondContent = readFileSync(MARKETPLACE_JSON_PATH, 'utf8');
+      const secondContent = readFileSync(MCP_JSON_PATH, 'utf8');
 
       expect(secondContent).toBe(firstContent);
     });
 
-    it('preserves existing plugins and metadata in marketplace.json', () => {
+    it('preserves mcpServers structure in .mcp.json', () => {
       execEnsureMemoryWithMock('python-found');
 
-      const config = JSON.parse(readFileSync(MARKETPLACE_JSON_PATH, 'utf8'));
-      expect(config).toHaveProperty('name', 'shinra-marketplace');
-      expect(config).toHaveProperty('plugins');
-      expect(config.plugins.length).toBeGreaterThan(0);
-      expect(config.plugins[0]).toHaveProperty('name', 'mako-ai-agents');
-      expect(config).toHaveProperty('metadata');
+      const config = JSON.parse(readFileSync(MCP_JSON_PATH, 'utf8'));
+      expect(config).toHaveProperty('mcpServers');
+      expect(config.mcpServers).toHaveProperty('memory');
+      expect(config.mcpServers.memory).toHaveProperty('command');
+      expect(config.mcpServers.memory).toHaveProperty('args');
+      expect(config.mcpServers.memory).toHaveProperty('env');
     });
   });
 
