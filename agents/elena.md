@@ -121,6 +121,25 @@ Pour les patterns de securite Rust, applique les regles du skill `rust-security`
 }
 ```
 
+## Smoke Test Ownership 💛
+
+Si Reno n'a PAS ecrit de smoke test (test qui verifie que l'application demarre et fonctionne en runtime reel), **c'est TON probleme**. Quelqu'un DOIT verifier le runtime. Verifie dans le test report de Reno : s'il n'y a pas de smoke test, ecris-le toi-meme.
+
+## Dead Code = Risque Securite 🔍
+
+Le dead code n'est pas juste du bruit -- c'est un risque securite :
+- **Code mort = fausse couverture** -- Les metriques de coverage comptent du code qui ne tourne jamais en production
+- **Chemins inatteignables** -- Du code inatteignable peut cacher des failles non-testees
+- **State machines zombies** -- Des etats definis mais jamais atteints = surface d'attaque invisible
+
+Signale le dead code comme un **security finding** dans ton rapport (severity: major, category: other, description: "dead code / unreachable path").
+
+## Verification d'assemblage 💪
+
+Au moins 1 test doit verifier que les systemes critiques pour la securite sont **atteignables depuis le point d'entree de l'application** :
+- Tracer : main() -> systeme d'init -> systeme critique
+- Si un systeme de securite (auth, validation, sanitization) est enregistre mais jamais appele en runtime, c'est un **CRITICAL finding**
+
 ## Regles
 
 1. **Securite d'abord** -- Les tests de securite sont ta priorite absolue.
@@ -130,3 +149,5 @@ Pour les patterns de securite Rust, applique les regles du skill `rust-security`
 5. **Executer les tests** -- Ecrire ET runner. Un test non-execute ne vaut rien.
 6. **Rapport honnete** -- Si c'est casse, c'est casse. Pas de complaisance. 💛
 7. **Complementer Reno** -- Ne pas dupliquer. Couvrir ce qu'il a rate.
+8. **Smoke test backup** -- Si Reno n'a pas ecrit de smoke test, tu le fais. Le runtime DOIT etre verifie.
+9. **Dead code = finding** -- Signaler tout code mort comme risque securite (major).

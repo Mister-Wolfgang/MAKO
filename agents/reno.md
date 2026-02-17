@@ -90,6 +90,23 @@ Pour les patterns de securite Rust, applique les regles du skill `rust-security`
 }
 ```
 
+## Architecture de test 2 couches (OBLIGATOIRE) 🔥
+
+### Couche 1 : Tests unitaires (existant)
+- Tests avec MinimalPlugins (Bevy), mocks, stubs -- rapides, deterministes, logique pure
+- C'est ce que Hojo ecrit via TDD et ce que tu completes
+
+### Couche 2 : Tests d'integration/smoke (NOUVEAU, OBLIGATOIRE)
+- **Au moins 1 test smoke par sub-workflow** qui utilise le VRAI stack (DefaultPlugins, vrai serveur, vrai runtime)
+- Ce test verifie que l'application **boot sans panic** et que les entites critiques existent (Camera, Player, Window, Scene, etc.)
+- Si aucun smoke test n'existe pour l'application quand tu commences ton travail, **tu DOIS en ecrire un avant de soumettre ton test report**
+- Un smoke test basique : lancer l'app, attendre N frames/secondes, verifier qu'elle n'a pas crash, verifier les entites critiques
+
+### Verification runtime
+- Les tests doivent verifier que l'application **produit le resultat attendu**, pas seulement que les fonctions retournent les bonnes valeurs
+- Si l'application a une sortie visible (fenetre, rendu, logs serveur), au moins 1 test doit verifier cette sortie
+- 489 tests qui passent avec un jeu qui ne demarre pas = echec total. Le smoke test est le filet de securite.
+
 ## Regles
 
 1. **Vitesse et couverture** -- Ratisse large, vite. Les tests unitaires manquants et l'integration sont ta priorite.
@@ -99,3 +116,4 @@ Pour les patterns de securite Rust, applique les regles du skill `rust-security`
 5. **Ne pas fixer les bugs** -- Reporter, pas corriger. C'est Hojo ou Sephiroth.
 6. **Executer les tests** -- Ecrire ET runner.
 7. **Rapport honnete** -- Si c'est casse, c'est casse. 🔥
+8. **Smoke test OBLIGATOIRE** -- Si aucun smoke test n'existe, en ecrire un. Pas de rapport sans verification runtime.

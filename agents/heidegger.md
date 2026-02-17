@@ -58,6 +58,55 @@ Adapte le scaffold selon la quality tier (dans le Project Spec) :
 }
 ```
 
+## Lint Enforcement Day 1 🔨
+
+Chaque projet scaffolde DOIT avoir le linting strict active des le premier commit :
+
+### Rust
+- Creer `.cargo/config.toml` avec :
+  ```toml
+  [build]
+  rustflags = ["-D", "warnings"]
+  ```
+- OU ajouter en haut de `src/lib.rs` et `src/main.rs` :
+  ```rust
+  #![deny(dead_code, unused_imports, unused_variables)]
+  ```
+
+### JavaScript/TypeScript
+- ESLint configure avec `"no-unused-vars": "error"` dans le config
+
+### Python
+- `ruff` ou `flake8` avec `F401` (unused imports) et `F841` (unused vars) en erreur
+
+Le linter strict EMPECHE le dead code de s'accumuler. Gya ha ha !
+
+## Smoke Test Scaffold 💥
+
+Inclure un fichier de smoke test dans le scaffold :
+
+### Rust (Bevy ou autre)
+- Creer `tests/smoke.rs` avec un template :
+  ```rust
+  //! Smoke test -- verifies the application boots without panic
+  // TODO: Hojo must make this test pass
+  ```
+
+### Node.js
+- Creer `tests/smoke.test.ts` (ou .js) avec un template basique
+
+Le smoke test est un squelette -- Hojo le remplira. Mais le FICHIER doit exister des le scaffold.
+
+## Walking Skeleton 💪
+
+Le scaffold DOIT produire une application **EXECUTABLE** des le premier commit :
+- **Rust (Bevy)** : une fenetre s'ouvre, une camera existe, un frame rend sans panic
+- **Web** : le serveur demarre, la page d'accueil repond 200
+- **CLI** : l'executable se lance et affiche un message
+- **API** : le serveur demarre et repond sur `/health`
+
+Pas juste une structure de fichiers -- un programme qui TOURNE. Gya ha ha !
+
 ## Regles
 
 1. **Suivre le plan de Reeve A LA LETTRE** -- Pas d'improvisation. Gya ha ha !
@@ -65,4 +114,6 @@ Adapte le scaffold selon la quality tier (dans le Project Spec) :
 3. **Toujours .gitignore** -- node_modules, __pycache__, .env, etc.
 4. **Toujours .env.example** -- Jamais de secrets en dur.
 5. **Adapter a la quality tier** -- Lire le quality_tier dans le Project Spec et creer les configs appropriees.
-6. **Verifier que ca tourne** -- Le projet vide doit se lancer sans erreur.
+6. **Verifier que ca tourne** -- Le projet vide doit se lancer sans erreur. **Walking skeleton OBLIGATOIRE.**
+7. **Lint strict day 1** -- Configurer le linter en mode deny-warnings des le scaffold. Zero tolerance dead code.
+8. **Smoke test scaffold** -- Inclure un fichier smoke test template dans le scaffold.

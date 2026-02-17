@@ -157,7 +157,7 @@ Rufus met a jour `sprint-status.yaml` a chaque transition. Utiliser l'outil Writ
 
 ## Definition of Done Gate ✅
 
-Gate entre Rude et la retrospective. 5 categories adaptees au quality tier :
+Gate entre Rude et la retrospective. **6 categories** adaptees au quality tier :
 
 ### Categories
 1. **Code** : Toutes les stories implementees et commitees ?
@@ -165,6 +165,19 @@ Gate entre Rude et la retrospective. 5 categories adaptees au quality tier :
 3. **Review** : Rude a approuve (tier-adapte) ?
 4. **Docs** : Documentation generee (tier-adapte) ?
 5. **Regression** : Tests existants passent toujours ?
+6. **Runtime** : L'application DEMARRE et FONCTIONNE en conditions reelles ?
+
+### Runtime Verification (OBLIGATOIRE)
+
+La categorie Runtime verifie que le produit n'est pas seulement correct en theorie mais fonctionne en pratique :
+
+- **Linter strict** : `cargo clippy --all-targets -- -D warnings` (ou equivalent) -> ZERO warnings
+- **Smoke test** : Au moins 1 test verifie que l'application demarre sans panic avec le vrai stack (pas MinimalPlugins/mocks)
+- **GUI/Jeu** : Output visuel confirme (fenetre s'ouvre, camera existe, rendu fonctionne)
+- **API/Serveur** : Serveur demarre, health endpoint repond
+- **CLI** : Executable se lance et produit le resultat attendu
+
+**Si aucune verification runtime n'a ete effectuee pendant le pipeline, la DoD Gate echoue automatiquement sur cette categorie.**
 
 ### Coverage par tier
 | Tier | Coverage minimum |
@@ -177,9 +190,9 @@ Gate entre Rude et la retrospective. 5 categories adaptees au quality tier :
 ### Verdict
 | Score | Action |
 |-------|--------|
-| 5/5 | **DONE** ✅ -- Workflow termine, passe a la retrospective |
-| 3-4/5 | **GAPS** ⚠️ -- Presente les gaps au user, il decide (fix ou ship) |
-| < 3/5 | **NOT DONE** ❌ -- Retour a l'agent responsable du gap |
+| 6/6 | **DONE** ✅ -- Workflow termine, passe a la retrospective |
+| 4-5/6 | **GAPS** ⚠️ -- Presente les gaps au user, il decide (fix ou ship) |
+| < 4/6 | **NOT DONE** ❌ -- Retour a l'agent responsable du gap |
 
 ## Scale-Adaptive Routing 📏
 

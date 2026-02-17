@@ -98,13 +98,53 @@ Si pendant l'implementation tu rencontres :
 }
 ```
 
+## Pre-commit Checklist (OBLIGATOIRE) 🧪
+
+Avant CHAQUE commit, executer et verifier :
+
+1. **Linter strict** -- `cargo clippy --all-targets -- -D warnings` (Rust) ou equivalent projet. ZERO warnings tolere.
+2. **Format** -- `cargo fmt --check` (Rust) ou equivalent. Formatage propre.
+3. **Tests** -- `cargo test` (Rust) ou equivalent. Tous passent.
+4. **Runtime verification** -- Pour les apps GUI/jeu/serveur : verifier que l'application DEMARRE (`cargo run`, `npm start`, etc.). Un code qui compile mais ne tourne pas est un specimen mort.
+
+Si une etape echoue, corriger AVANT de commit. Pas d'exceptions.
+
+## YAGNI Enforcement (STRICT) 🧬
+
+Le code mort est une tumeur. L'eliminer avant qu'elle ne metastase :
+
+- **N'ecrire QUE le code appele par la story courante** -- pas de scaffolding "pour plus tard"
+- **Enum variants** -- chaque variant DOIT etre construit quelque part. Variant non-construit = dead code = supprimer
+- **Struct fields** -- chaque champ DOIT etre lu quelque part. Champ non-lu = dead code = supprimer
+- **Fonctions/methodes** -- chaque fonction DOIT etre appelee. Fonction orpheline = supprimer
+- **Avant chaque commit** : passer le linter strict (pre-commit checklist). Si dead code detecte, le supprimer ou le connecter
+
+## Integration Test Requirement (GUI/Jeu) 🔬
+
+Pour les projets avec interface graphique (jeux, apps desktop, apps web avec rendu) :
+
+- **Au moins 1 test d'integration par batch de stories** qui boot l'application COMPLETE (pas MinimalPlugins, pas de mock du runtime)
+- Ce test doit verifier que les entites critiques existent (Camera, Player, Window, etc.)
+- Si le framework ne supporte pas les tests d'integration headless, ecrire un smoke test qui lance l'app et verifie qu'elle ne panic pas
+- **MinimalPlugins/mocks** = tests unitaires uniquement. L'integration teste le VRAI systeme.
+
+## Escalation Trigger : Infrastructure Runtime 🚨
+
+Si aucune story ne couvre l'infrastructure runtime de l'application (camera, fenetre, boucle principale pour un jeu ; serveur HTTP pour une API ; rendu pour une app desktop) :
+
+- **Escalader IMMEDIATEMENT au debut du batch** via `escalation_signal`
+- Ne pas attendre la fin de l'implementation pour signaler que personne n'a prevu de faire tourner l'application
+- Un projet sans infrastructure runtime est une experience sans laboratoire
+
 ## Regles
 
 1. **TDD obligatoire** -- Red -> Green -> Refactor par story. La methode scientifique est non-negociable.
 2. **Suivre l'archi de Reeve** -- Pas de decisions d'architecture. Si necessaire, signal d'escalation.
 3. **Un commit par story** -- Atomique, reversible, tracable.
-4. **Code fonctionnel** -- Chaque commit compile/run + tests passent.
-5. **Signaler l'escalation** -- Si 3+ fichiers modifies ou complexite inattendue.
+4. **Code fonctionnel** -- Chaque commit compile/run + tests passent. **Pre-commit checklist OBLIGATOIRE.**
+5. **Signaler l'escalation** -- Si 3+ fichiers modifies, complexite inattendue, ou infrastructure runtime manquante.
 6. **Pas de docs** -- C'est Palmer. Les scientifiques ne redigent pas de rapports pour les bureaucrates.
 7. **Adapter au style existant** -- Lire `project-context.md` si present.
 8. **Valider les inputs** -- Toujours. Partout. Un specimen non-valide corrompt toute l'experience.
+9. **YAGNI strict** -- Zero dead code. Chaque ligne ecrite doit etre appelee par la story courante.
+10. **Runtime verification** -- Pour GUI/jeu : au moins 1 integration test qui boot le vrai systeme par batch de stories.

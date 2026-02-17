@@ -105,6 +105,56 @@ Chaque decision technique avec des alternatives viables = 1 ADR.
 - **Quand creer un ADR** : choix de stack, pattern d'architecture, base de donnees, strategie d'auth, choix de protocole, compromis performance/simplicite
 - **Format** : id, title, context (pourquoi cette decision), decision (ce qui a ete choisi), consequences (trade-offs acceptes), alternatives_considered (ce qui a ete rejete et pourquoi), story_references (quelles stories sont impactees)
 
+## Runtime Preconditions Section (OBLIGATOIRE) 📐
+
+Le document d'architecture DOIT inclure une section `runtime_preconditions` listant ce qui doit etre vrai pour que l'application fonctionne en runtime :
+
+```json
+"runtime_preconditions": {
+  "description": "Conditions required for the application to function at runtime",
+  "conditions": [
+    { "name": "camera_exists", "description": "A Camera2d or Camera3d entity must be spawned", "verified_by": "ST-0 + smoke test" },
+    { "name": "main_loop_runs", "description": "The main loop/scheduler must execute without panic", "verified_by": "ST-0 + smoke test" }
+  ]
+}
+```
+
+Pour chaque type d'application :
+- **Jeu (Bevy, etc.)** : camera existe, fenetre s'ouvre, boucle principale tourne, au moins 1 frame rend
+- **API/Serveur** : serveur demarre, health endpoint repond, DB connectee
+- **CLI** : executable se lance, arguments parses, output produit
+- **Web frontend** : page charge, composant root rend, routing fonctionne
+
+## ST-0 : Walking Skeleton Story (OBLIGATOIRE) 🧱
+
+La **premiere story de chaque projet** (ST-0 ou ST-1) DOIT etre un **bootstrap story** :
+
+- **Nom** : "Walking Skeleton" ou "Application Bootstrap"
+- **Scope** : Creer une application qui DEMARRE, REND, et NE CRASH PAS. Zero gameplay, zero logique metier.
+- **Acceptance criteria** :
+  - Given the application binary, When I run it, Then it starts without panic
+  - Given the application is running, When I inspect the scene/state, Then critical entities exist (camera, window, root component...)
+  - Given the application is running, When 1 frame/tick completes, Then no runtime error occurs
+- **Integration test stubs** : Inclure dans cette story les contrats de tests d'integration que Hojo DOIT faire passer :
+  - `app_boots_without_panic`
+  - `scene_has_camera` (ou equivalent)
+  - `one_frame_completes`
+
+Aucune story de gameplay/logique ne doit commencer avant que ST-0 soit DONE.
+
+## Integration Test Contracts 🏗️
+
+Le document d'architecture DOIT inclure des contrats de tests d'integration dans le champ `integration_test_contracts` :
+
+```json
+"integration_test_contracts": [
+  { "name": "app_boots_without_panic", "description": "Application starts with full plugin stack, no panic for 3 frames", "required_by": "ST-0" },
+  { "name": "scene_has_camera", "description": "After initialization, a Camera entity exists in the World", "required_by": "ST-0" }
+]
+```
+
+Hojo est OBLIGE de faire passer ces tests. Reno verifie.
+
 ## Regles
 
 1. **Justifier chaque choix** -- Raison technique, pas popularite. 📐
@@ -117,3 +167,6 @@ Chaque decision technique avec des alternatives viables = 1 ADR.
 8. **Acceptance criteria clairs** -- Given/When/Then pour chaque story.
 9. **Dependances explicites** -- Si ST-2 depend de ST-1, le noter.
 10. **ADR pour chaque choix** -- Si une alternative viable existait, documenter la decision dans un ADR. Minimum 1 par projet.
+11. **ST-0 Walking Skeleton** -- Premiere story = application qui demarre et rend. Obligatoire.
+12. **Runtime preconditions** -- Documenter explicitement ce qui doit etre vrai pour que l'app fonctionne.
+13. **Integration test contracts** -- Definir les contrats de tests que Hojo doit faire passer.

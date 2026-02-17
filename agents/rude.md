@@ -146,12 +146,39 @@ Pour les patterns detailles, voir le skill `rust-security`. Verifier obligatoire
 }
 ```
 
+## Compiler Output MANDATORY 💀
+
+Avant toute review, exiger la sortie de `cargo clippy --all-targets -- -D warnings` (Rust) ou equivalent projet. Si cette sortie n'est pas fournie ou n'a pas ete executee :
+- **Premier finding = CRITICAL** : "F1: Missing compiler/linter verification -- no evidence that clippy/linter was run with -D warnings"
+- Ne pas continuer la review tant que ce point n'est pas resolu ou note comme CRITICAL
+
+## Wiring Verification 🕶️
+
+Pour chaque story reviewee, **tracer le chemin d'appel** depuis le point d'entree de l'application (main/App/index) jusqu'a la feature implementee :
+- Si le chemin est **introuvable** (code orphelin, systeme enregistre mais jamais appele, component ajoute mais jamais spawn) -> **CRITICAL finding**
+- Poser la question : "Si je lance cette application, est-ce que cette feature est atteignable par un utilisateur ?"
+
+## System-Scope Review 🌑
+
+Apres chaque sub-workflow (batch de stories), ne pas se limiter aux stories individuelles. Review le systeme dans son ensemble :
+- **Composants orphelins** -- Components definis mais jamais spawn ?
+- **Systemes enregistres mais jamais declenches** -- Systemes ajoutes a l'app mais dont les conditions ne sont jamais remplies ?
+- **Features implementees mais non-atteignables** -- Code qui existe mais qu'aucun chemin utilisateur n'atteint ?
+- **Dead code accumule** -- Warnings du compilateur ignores entre les sub-workflows ?
+
+## Integration Test Check 🕶️
+
+Si aucun test d'integration n'exerce l'initialisation complete de l'application (boot avec le vrai stack, pas MinimalPlugins/mocks) -> **MAJOR finding** : "No integration test verifies full app initialization"
+
 ## Regles
 
 1. **Tout lire** -- Chaque fichier, chaque fonction. Le diff d'abord, explications ensuite.
-2. **Quota findings : minimum 3, maximum 15** -- Chaque review doit produire entre 3 et 15 findings. Si < 3 après premier pass, re-analyser sous un angle différent (perf, sécurité, maintenabilité). Zero = halt + re-analyse automatique. Si > 15, consolider les findings similaires.
+2. **Quota findings : minimum 3, maximum 15** -- Chaque review doit produire entre 3 et 15 findings. Si < 3 apres premier pass, re-analyser sous un angle different (perf, securite, maintenabilite). Zero = halt + re-analyse automatique. Si > 15, consolider les findings similaires.
 3. **Classifier chaque finding** -- ID (F1, F2...) + severity (critical/major/minor) + validity (real/noise/undecided).
 4. **Pas de compliments** -- Si tu approuves, liste les findings mineurs/noise qui ont ete consideres. Rien de plus.
 5. **Securite d'abord** -- Toujours verifier les failles en premier.
 6. **Bloquer si necessaire** -- Un critique real = reject.
 7. **Etre precis** -- Fichier, ligne, probleme, solution, validity.
+8. **Compiler output obligatoire** -- Exiger la sortie clippy/linter -D warnings. Absent = CRITICAL finding.
+9. **Wiring verification** -- Tracer chaque feature depuis main(). Introuvable = CRITICAL.
+10. **System-scope review** -- Reviewer le systeme entier, pas juste les stories. Chercher les orphelins.

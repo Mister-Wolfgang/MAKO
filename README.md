@@ -58,6 +58,10 @@ Adaptation automatique de la rigueur selon le tier choisi :
 * **Comprehensive** : Docker + Coverage + E2E + ADRs.
 * **Production-Ready** : Audit Sécurité + Chaos Engineering + Runbooks.
 
+### Definition of Done Gate
+
+6 catégories adaptées au quality tier : **Code**, **Tests** (coverage 50-90% selon tier), **Review**, **Docs**, **Regression**, **Runtime** (linter strict, smoke test, vérification visuelle).
+
 ### TDD Protocol (Hojo)
 
 Implémentation stricte :
@@ -98,6 +102,23 @@ mako-claude-agent-kit/
 ---
 
 ## 📜 Changelog
+
+### v6.2.0 — "Runtime Reckoning"
+
+* **Runtime DoD Gate** : Nouvelle 6ème catégorie (Runtime) — bloque le pipeline si l'application n'a jamais été vérifiée en exécution.
+* **Hojo: Pre-commit checklist** : `clippy -D warnings` + `fmt` + test + vérification runtime obligatoires avant chaque commit.
+* **Hojo: YAGNI strict** : Élimination stricte du dead code — pas de variants, fields ou fonctions inutilisés.
+* **Hojo: Integration tests** : Apps GUI/game doivent avoir au moins 1 test d'intégration avec le vrai stack par batch.
+* **Reno: 2-layer testing** : Smoke test obligatoire avec le vrai plugin stack (pas MinimalPlugins).
+* **Elena: Smoke test backup** : Si Reno oublie le smoke test, Elena le couvre. Dead code = finding sécurité.
+* **Rude: Compiler output mandatory** : Output clippy/linter manquant = finding CRITICAL.
+* **Rude: Wiring verification** : Trace la chaîne main() → feature. Code orphelin = CRITICAL.
+* **Rude: System-scope review** : Review du système entier après chaque sub-workflow.
+* **Heidegger: Lint day 1** : Scaffold inclut `-D warnings` dès le premier commit.
+* **Heidegger: Walking skeleton** : Scaffold produit une application EXÉCUTABLE, pas juste une structure de fichiers.
+* **Reeve: Runtime preconditions** : L'architecture doit lister les préconditions runtime (caméra, fenêtre, etc.).
+* **Reeve: ST-0 Walking Skeleton** : Première story = l'app démarre + entités critiques existent + pas de panic.
+* **Reeve: Integration test contracts** : L'architecture définit des contrats de test que Hojo doit respecter.
 
 ### v6.1.0 — "Lucrecia's Awakening"
 
