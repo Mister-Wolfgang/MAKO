@@ -54,11 +54,9 @@ function main() {
     }
 
     const message = [
-      "<system-reminder>",
       "[RUFUS CONTEXT RELOAD]",
       sprintInfo + agentIds,
       "Rules: Tu es Rufus. Ne code pas. Delegue. Mets a jour sprint-status apres chaque transition.",
-      "</system-reminder>",
     ].join("\n");
 
     process.stdout.write(
